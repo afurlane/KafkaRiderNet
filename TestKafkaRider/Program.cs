@@ -14,50 +14,32 @@ namespace KafkaTest
 
             services.AddMassTransit(x =>
             {
-                // x.UsingRabbitMq((context, cfg) => cfg.ConfigureEndpoints(context));
+                x.UsingInMemory((context, cfg) => cfg.ConfigureEndpoints(context));
 
                 x.AddRider(rider =>
                 {
+                    rider.AddConsumer<MessageConsumer>();
+
                     rider.AddProducer<Message>("topic-name");
 
                     rider.UsingKafka((context, k) =>
                     {
                         k.Host("localhost:9092");
+
+                        k.TopicEndpoint<Message>("topic-name", "consumer-group-name", e =>
+                        {
+                            e.CreateIfMissing(t =>
+                            {
+                                t.NumPartitions = 2; //number of partitions
+                                t.ReplicationFactor = 1; //number of replicas
+                            });
+                            e.ConfigureConsumer<MessageConsumer>(context);
+                        });
                     });
                 });
             });
-
-            var provider = services.BuildServiceProvider();
-
-            var busControl = provider.GetRequiredService<IBusControl>();
-
-            await busControl.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
-            try
-            {
-                var producer = provider.GetRequiredService<ITopicProducer<Message>>();
-                do
-                {
-                    string value = await Task.Run(() =>
-                    {
-                        Console.WriteLine("Enter text (or quit to exit)");
-                        Console.Write("> ");
-                        return Console.ReadLine();
-                    });
-
-                    if ("quit".Equals(value, StringComparison.OrdinalIgnoreCase))
-                        break;
-
-                    await producer.Produce(new
-                    {
-                        Text = value
-                    });
-                }
-                while (true);
-            }
-            finally
-            {
-                await busControl.StopAsync();
-            }
+            Producer testProducer = new Producer();
+            await testProducer.StartProducer(services); 
         }
     }
 }

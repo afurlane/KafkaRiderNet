@@ -11,7 +11,7 @@ namespace TestKafkaRider
     {
         public Task Consume(ConsumeContext<Message> context)
         {
-            Console.Write(context.Message.Text);
+            Console.Write("Received message is " + context.Message.Text);
             return Task.CompletedTask;
         }
     }
