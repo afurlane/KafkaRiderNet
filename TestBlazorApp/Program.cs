@@ -46,7 +46,6 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
 }
 
-
 app.UseStaticFiles();
 
 app.UseRouting();
@@ -56,5 +55,3 @@ app.MapHub<ChatResource>(ChatResource.ChatURL);
 app.MapFallbackToPage("/_Host");
 
 app.Run();
-
-

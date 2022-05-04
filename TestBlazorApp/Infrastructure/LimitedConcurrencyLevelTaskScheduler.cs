@@ -53,7 +53,7 @@
                     // Process all available items in the queue.
                     while (true)
                     {
-                        Task item;
+                        Task? item = null;
                         lock (_tasks)
                         {
                             // When there are no more items to be processed,
@@ -65,12 +65,15 @@
                             }
 
                             // Get the next item from the queue
-                            item = _tasks.First.Value;
+                            var taskNode = _tasks.First;
+                            if (taskNode != null)
+                                item = taskNode.Value;
                             _tasks.RemoveFirst();
                         }
 
                         // Execute the task we pulled out of the queue
-                        base.TryExecuteTask(item);
+                        if (item != null)
+                            base.TryExecuteTask(item);
                     }
                 }
                 // We're done processing items on the current thread
