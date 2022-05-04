@@ -10,7 +10,7 @@ namespace TestKafkaRider
 {
     public class Producer
     {
-        public async Task StartProducer(ServiceCollection services) {
+        public async Task StartProducer(IServiceCollection services) {
 
             var provider = services.BuildServiceProvider();
 
