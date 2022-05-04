@@ -36,6 +36,8 @@ builder.Services.AddMassTransit(x =>
     });
 });
 
+builder.Services.AddHostedService<Producer>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -56,6 +58,3 @@ app.MapFallbackToPage("/_Host");
 app.Run();
 
 
-
-Producer testProducer = new Producer();
-await testProducer.StartProducer(builder.Services);

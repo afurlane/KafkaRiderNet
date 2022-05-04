@@ -1,48 +1,62 @@
 ﻿using MassTransit;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using TestBlazorApp.Infrastructure;
 
 namespace TestKafkaRider
 {
-    public class Producer
+    public class Producer : IHostedService, IDisposable
     {
-        public async Task StartProducer(IServiceCollection services) {
+        private readonly ILogger<Producer> logger;
+        private readonly ServiceProvider serviceProvider;
+        private IBusControl busControl;
+        private readonly Random random;
+        private readonly LimitedConcurrencyLevelTaskScheduler lcts;
+        private List<Task> tasks = new List<Task>();
+        private readonly TaskFactory factory;
 
-            var provider = services.BuildServiceProvider();
+        public Producer(IServiceCollection serviceCollection, ILogger<Producer> logger)
+        {
+            serviceProvider = serviceCollection.BuildServiceProvider();
+            busControl = serviceProvider.GetRequiredService<IBusControl>();
+            this.logger = logger;
+            random = new Random();
+            lcts = new LimitedConcurrencyLevelTaskScheduler(2);
+            factory = new TaskFactory(lcts);
+        }
 
-            var busControl = provider.GetRequiredService<IBusControl>();
+        public async Task StartAsync(CancellationToken cancellationToken)
+        {
 
             await busControl.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
             try
             {
-                var producer = provider.GetRequiredService<ITopicProducer<Message>>();
-                do
+                var producer = serviceProvider.GetRequiredService<ITopicProducer<Message>>();
+                if (producer != null)
                 {
-                    string value = await Task.Run(() =>
-                    {
-                        Console.WriteLine("Enter text (or quit to exit)");
-                        Console.Write("> ");
-                        return Console.ReadLine();
-                    });
-
-                    if ("quit".Equals(value, StringComparison.OrdinalIgnoreCase))
-                        break;
-
-                    await producer.Produce(new
-                    {
-                        Text = value
-                    });
+                    Task t = factory.StartNew(() => {
+                            producer.Produce(new
+                            {
+                                Text = random.Next().ToString()
+                            }, cancellationToken);
+                    }, cancellationToken);
+                    tasks.Add(t);
                 }
-                while (true);
+
             }
-            finally
+            catch (Exception ex)
             {
-                await busControl.StopAsync();
+                logger.LogError("Auch!", ex);
             }
+        }
+
+        public async Task StopAsync(CancellationToken cancellationToken)
+        {
+            if (busControl != null)
+                await busControl.StopAsync();
+        }
+
+        public void Dispose()
+        {
+            // Dispose
         }
     }
 }
