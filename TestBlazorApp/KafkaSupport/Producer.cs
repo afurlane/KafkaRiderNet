@@ -47,11 +47,12 @@ namespace TestKafkaRider
                             while (!cancellationToken.IsCancellationRequested)
                             {
                                 logger.LogInformation("Sending a message");
+                                var randomValue = random.Next(10000);
                                 producer.Produce(new
                                 {
-                                    Text = random.Next().ToString()
+                                    Text = randomValue.ToString()
                                 }, cancellationToken);
-                                Thread.Sleep(1000);
+                                Thread.Sleep(randomValue);
                             }
                         }, cancellationToken);
                         tasks.Add(t);
