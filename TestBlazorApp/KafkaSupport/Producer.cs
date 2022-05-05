@@ -6,19 +6,21 @@ namespace TestKafkaRider
     public class Producer : IHostedService, IDisposable
     {
         private readonly ILogger<Producer> logger;
+        private readonly IServiceScopeFactory serviceFactory;
         private readonly IBusControl busControl;
         // private readonly ITopicProducer<Message> producer;
-        private readonly ServiceProvider provider;
+        // private readonly ServiceProvider provider;
         private readonly Random random;
         private readonly LimitedConcurrencyLevelTaskScheduler lcts;
-        private List<Task> tasks = new List<Task>();
         private readonly TaskFactory factory;
+        private List<Task> tasks = new List<Task>();
 
-        public Producer(IBusControl busControl, ILogger<Producer> logger)
+        public Producer(IBusControl busControl, ILogger<Producer> logger, IServiceScopeFactory serviceFactory)
         {
-            this.provider = new ServiceCollection().BuildServiceProvider();
+            // this.provider = new ServiceCollection().BuildServiceProvider();
             this.busControl = busControl;
             this.logger = logger;
+            this.serviceFactory = serviceFactory;
             random = new Random();
             lcts = new LimitedConcurrencyLevelTaskScheduler(2);
             factory = new TaskFactory(lcts);
@@ -26,39 +28,54 @@ namespace TestKafkaRider
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-
-            await busControl.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
-            ITopicProducer<Message> producer = provider.GetRequiredService<ITopicProducer<Message>>();
-            try
+            // Wait until the bus is started!
+            while (busControl.CheckHealth().Status != BusHealthStatus.Healthy && !cancellationToken.IsCancellationRequested)
             {
-                if (producer != null)
-                {
-                    Task t = factory.StartNew(() => {
-                        producer.Produce(new
-                        {
-                            Text = random.Next().ToString()
-                        }, cancellationToken);
-                        Thread.Sleep(1000);
-                    }, cancellationToken);
-                    tasks.Add(t);
-                }
-
+                Thread.Sleep(1000);
             }
-            catch (Exception ex)
+            if(!cancellationToken.IsCancellationRequested)
             {
-                logger.LogError("Auch!", ex);
+
+                // ITopicProducer<Message> producer = provider.GetRequiredService<ITopicProducer<Message>>();
+                ITopicProducer<Message> producer = serviceFactory.CreateScope().ServiceProvider.GetRequiredService<ITopicProducer<Message>>();
+                try
+                {
+                    if (producer != null)
+                    {
+                        Task t = factory.StartNew(() =>
+                        {
+                            while (!cancellationToken.IsCancellationRequested)
+                            {
+                                logger.LogInformation("Sending a message");
+                                producer.Produce(new
+                                {
+                                    Text = random.Next().ToString()
+                                }, cancellationToken);
+                                Thread.Sleep(1000);
+                            }
+                        }, cancellationToken);
+                        tasks.Add(t);
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError("Auch!", ex);
+                }
             }
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {            
-            if (busControl != null)
-                await busControl.StopAsync();
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            return factory.StartNew(() =>
+            {
+                logger.LogInformation(cancellationToken.IsCancellationRequested ? "Requested cancellation" : "Cancellation not requested!");
+            });
         }
 
         public void Dispose()
         {
-            // Dispose
+            logger.LogInformation("Disposing content");
         }
     }
 }

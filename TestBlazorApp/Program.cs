@@ -9,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<WeatherForecastService>();
+builder.Services.AddScoped<MessageConsumer>();
+
 builder.Services.AddMassTransit(x =>
 {
     x.UsingInMemory((context, cfg) => cfg.ConfigureEndpoints(context));
@@ -31,10 +33,27 @@ builder.Services.AddMassTransit(x =>
                     t.ReplicationFactor = 1; //number of replicas
                 });
                 e.ConfigureConsumer<MessageConsumer>(context);
+                // e.Consumer<MessageConsumer>();
             });
         });
+        rider.AddConsumer<MessageConsumer>();
     });
 });
+
+builder.Services.AddOptions<MassTransitHostOptions>()
+                .Configure(options =>
+                {
+                    // if specified, waits until the bus is started before
+                    // returning from IHostedService.StartAsync
+                    // default is false
+                    options.WaitUntilStarted = true;
+
+                    // if specified, limits the wait time when starting the bus
+                    options.StartTimeout = TimeSpan.FromSeconds(10);
+
+                    // if specified, limits the wait time when stopping the bus
+                    options.StopTimeout = TimeSpan.FromSeconds(30);
+                });
 
 builder.Services.AddHostedService<Producer>();
 
