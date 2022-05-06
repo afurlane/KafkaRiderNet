@@ -5,6 +5,15 @@ namespace TestBlazorApp.Chat
     public class ChatResource : Hub
     {
         public const string ChatURL = "/chat";
+        private readonly ILogger<ChatResource> logger;
+        private readonly IConnectionHandler connectionHandler;
+
+        public ChatResource(ILogger<ChatResource> logger, IConnectionHandler connectionHandler)
+        {
+            this.logger = logger;
+            this.connectionHandler = connectionHandler;
+        }
+
         public void Send(string userName, string message)
         {
             // Call the broadcastMessage method to update clients.
@@ -12,13 +21,18 @@ namespace TestBlazorApp.Chat
         }
         public override Task OnConnectedAsync()
         {
-            Console.WriteLine($"{Context.ConnectionId} connected");
+
+            String connId = Context.ConnectionId;
+            connectionHandler.AddClient(connId);
+            logger.LogInformation($"{connId} connected");
             return base.OnConnectedAsync();
         }
 
         public override async Task OnDisconnectedAsync(Exception? e)
         {
-            Console.WriteLine($"Disconnected {e?.Message} {Context.ConnectionId}");
+            string connId = Context.ConnectionId;
+            connectionHandler.RemoveClient(connId);
+            logger.LogInformation($"Disconnected {e?.Message} {connId}");
             await base.OnDisconnectedAsync(e);
         }
     }
